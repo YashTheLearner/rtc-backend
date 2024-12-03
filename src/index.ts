@@ -1,21 +1,15 @@
 import { WebSocketServer, WebSocket, RawData } from "ws";
 import dotenv from 'dotenv';
-// Extend WebSocket type to include clientId and name
+
 interface ExtendedWebSocket extends WebSocket {
   clientId: string;
   name: string;
 }
 
-dotenv.config(); // Load environment variables from .env file
-const port = parseInt(process.env.PORT || "8080"); // Ensure port is a number
+dotenv.config();
+const port = parseInt(process.env.PORT || "8080");
 const wss = new WebSocketServer({ port: port });
 console.log(`Server started on port ${port}`);
-
-type message = {
-  id: number;
-  text: string;
-  by: WebSocket;
-};
 
 type Room = {
   roomId: string;
@@ -23,101 +17,9 @@ type Room = {
 };
 const rooms: Room[] = [];
 
-// wss.on("connection", (ws) => {
-//   ws.on("error", console.error);
-
-//   ws.on("message", (data) => {
-//     handleMessage(ws, data);
-//   });
-
-//   ws.send(
-//     JSON.stringify({
-//       message: "connected",
-//     })
-//   );
-//   console.log("Client connected");
-
-  // ws.on("close", () => {
-  //   handleDisconnect(ws);
-  // });
-// });
-
-// const handleMessage = (ws: WebSocket, data: RawData) => {
-//   try {
-//     const parsedMsg = JSON.parse(data.toString());
-//     console.log(parsedMsg);
-//     console.log(parsedMsg.payload.message);
-
-//     switch (parsedMsg.type) {
-//       case "create-room":
-//         createRoom(ws);
-//         break;
-//       case "join-room":
-//         joinRoom(ws, parsedMsg.payload.roomId);
-//         break;
-//       case "leave-room":
-//         leaveRoom(ws, parsedMsg.payload.roomId);
-//         break;
-//       case "send-message":
-//         sendMessage(ws, parsedMsg.payload.roomId, parsedMsg.payload.message);
-//         break;
-//       default:
-//         ws.send(
-//           JSON.stringify({
-//             message: "invalid message type1",
-//           })
-//         );
-//     }
-//   } catch (err) {
-//     console.log("error ====>", err);
-//     ws.send(
-//       JSON.stringify({
-//         message: "invalid message type2",
-//       })
-//     );
-//   }
-// };
-
-
-
-// const sendMessage = (ws: WebSocket, roomId: string, message: any) => {
-//   const room = rooms.find((room) => room.roomId === roomId);
-//   if (room) {
-//     console.log("msg=>", message);
-//     console.log("msg=>", typeof message);
-//     console.log("msg=>", message.by);
-//     room.members.forEach((member) => {
-//       member.send(JSON.stringify({chatMsg:message})); // convert message object to JSON string
-//     });
-//   } else {
-//     ws.send(
-//       JSON.stringify({
-//         message: "Room not found",
-//       })
-//     );
-//   }
-// };
-
-const handleDisconnect = (ws: WebSocket) => {
-  rooms.forEach((room) => {
-    room.members = room.members.filter((member) => member !== ws);
-    if (room.members.length === 0) {
-      const index = rooms.indexOf(room);
-      rooms.splice(index, 1);
-    }
-  });
-  console.log("Client disconnected");
-};
-
-// const generateRoomId = () => {
-//   return Math.floor(100000 + Math.random() * 900000).toString(); // Ensures a 6-digit number
-// };
-
-// ---------------------
-
 wss.on("connection", (ws: ExtendedWebSocket) => {
-  ws.clientId = generateId(); // Assign unique client ID
-  ws.name = "Anonymous"; // Default name for the client
+  ws.clientId = generateId();
+  ws.name = "Anonymous";
 
   ws.on("message", (data) => {
     handleMessage(ws, data);
@@ -150,7 +52,7 @@ const handleMessage = (ws: ExtendedWebSocket, data: RawData) => {
 
     switch (parsedMsg.type) {
       case "set-name":
-        ws.name = parsedMsg.payload.name; // Update the name for the client
+        ws.name = parsedMsg.payload.name;
         ws.send(
           JSON.stringify({
             message: `Name set to ${ws.name}`,
@@ -160,7 +62,6 @@ const handleMessage = (ws: ExtendedWebSocket, data: RawData) => {
       case "send-message":
         sendMessage(ws, parsedMsg.payload.roomId, parsedMsg.payload.message);
         break;
-
       case "create-room":
         createRoom(ws);
         break;
@@ -170,13 +71,10 @@ const handleMessage = (ws: ExtendedWebSocket, data: RawData) => {
       case "leave-room":
         leaveRoom(ws, parsedMsg.payload.roomId);
         break;
-      case "send-message":
-        sendMessage(ws, parsedMsg.payload.roomId, parsedMsg.payload.message);
-        break;
       default:
         ws.send(
           JSON.stringify({
-            message: "invalid message type1",
+            message: "invalid message type",
           })
         );
     }
@@ -198,7 +96,7 @@ const sendMessage = (ws: ExtendedWebSocket, roomId: string, message: any) => {
         JSON.stringify({
           chatMsg: {
             text: message.text,
-            by: ws.name, // Use the name of the sender
+            by: ws.name,
           },
         })
       );
@@ -212,7 +110,6 @@ const sendMessage = (ws: ExtendedWebSocket, roomId: string, message: any) => {
   }
 };
 
-
 const createRoom = (ws: WebSocket) => {
   const roomId = generateId();
   console.log(`Room created with ID: ${roomId}`);
@@ -220,10 +117,9 @@ const createRoom = (ws: WebSocket) => {
   ws.send(
     JSON.stringify({
       message: `Room created with ID: ${roomId}`,
-      roomId:roomId,
+      roomId: roomId,
     })
   );
-  console.log(rooms, "end");
 };
 
 const joinRoom = (ws: WebSocket, roomId: string) => {
@@ -267,27 +163,32 @@ const leaveRoom = (ws: WebSocket, roomId: string) => {
 };
 
 const generateId = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString(); // Ensures a 6-digit number
+  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Graceful Shutdown
-const shutdown = () => {
-  console.log("Shutting down WebSocket server...");
-  
-  // Close all active WebSocket connections
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.close(1001, "Server shutting down"); // Close with status code 1001 (Going Away)
+const handleDisconnect = (ws: WebSocket) => {
+  rooms.forEach((room) => {
+    room.members = room.members.filter((member) => member !== ws);
+    if (room.members.length === 0) {
+      const index = rooms.indexOf(room);
+      rooms.splice(index, 1);
     }
   });
+  console.log("Client disconnected");
+};
 
-  // Stop the WebSocket server
+const shutdown = () => {
+  console.log("Shutting down WebSocket server...");
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.close(1001, "Server shutting down");
+    }
+  });
   wss.close(() => {
     console.log("WebSocket server closed.");
-    process.exit(0); // Exit the process
+    process.exit(0);
   });
 };
 
-// Listen for termination signals
-process.on("SIGINT", shutdown); // Handle Ctrl+C (SIGINT)
-process.on("SIGTERM", shutdown); // Handle termination signal (SIGTERM)
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
