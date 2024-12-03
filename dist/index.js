@@ -5,94 +5,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const ws_1 = require("ws");
 const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config(); // Load environment variables from .env file
-const port = parseInt(process.env.PORT || "8080"); // Ensure port is a number
+dotenv_1.default.config();
+const port = parseInt(process.env.PORT || "8080");
 const wss = new ws_1.WebSocketServer({ port: port });
 console.log(`Server started on port ${port}`);
 const rooms = [];
-// wss.on("connection", (ws) => {
-//   ws.on("error", console.error);
-//   ws.on("message", (data) => {
-//     handleMessage(ws, data);
-//   });
-//   ws.send(
-//     JSON.stringify({
-//       message: "connected",
-//     })
-//   );
-//   console.log("Client connected");
-// ws.on("close", () => {
-//   handleDisconnect(ws);
-// });
-// });
-// const handleMessage = (ws: WebSocket, data: RawData) => {
-//   try {
-//     const parsedMsg = JSON.parse(data.toString());
-//     console.log(parsedMsg);
-//     console.log(parsedMsg.payload.message);
-//     switch (parsedMsg.type) {
-//       case "create-room":
-//         createRoom(ws);
-//         break;
-//       case "join-room":
-//         joinRoom(ws, parsedMsg.payload.roomId);
-//         break;
-//       case "leave-room":
-//         leaveRoom(ws, parsedMsg.payload.roomId);
-//         break;
-//       case "send-message":
-//         sendMessage(ws, parsedMsg.payload.roomId, parsedMsg.payload.message);
-//         break;
-//       default:
-//         ws.send(
-//           JSON.stringify({
-//             message: "invalid message type1",
-//           })
-//         );
-//     }
-//   } catch (err) {
-//     console.log("error ====>", err);
-//     ws.send(
-//       JSON.stringify({
-//         message: "invalid message type2",
-//       })
-//     );
-//   }
-// };
-// const sendMessage = (ws: WebSocket, roomId: string, message: any) => {
-//   const room = rooms.find((room) => room.roomId === roomId);
-//   if (room) {
-//     console.log("msg=>", message);
-//     console.log("msg=>", typeof message);
-//     console.log("msg=>", message.by);
-//     room.members.forEach((member) => {
-//       member.send(JSON.stringify({chatMsg:message})); // convert message object to JSON string
-//     });
-//   } else {
-//     ws.send(
-//       JSON.stringify({
-//         message: "Room not found",
-//       })
-//     );
-//   }
-// };
-const handleDisconnect = (ws) => {
-    rooms.forEach((room) => {
-        room.members = room.members.filter((member) => member !== ws);
-        if (room.members.length === 0) {
-            const index = rooms.indexOf(room);
-            rooms.splice(index, 1);
-        }
-    });
-    console.log("Client disconnected");
-};
-// const generateRoomId = () => {
-//   return Math.floor(100000 + Math.random() * 900000).toString(); // Ensures a 6-digit number
-// };
-// ---------------------
 wss.on("connection", (ws) => {
-    ws.clientId = generateId(); // Assign unique client ID
-    ws.name = "Anonymous"; // Default name for the client
+    ws.clientId = generateId();
+    ws.name = "Anonymous";
     ws.on("message", (data) => {
         handleMessage(ws, data);
     });
@@ -115,7 +35,7 @@ const handleMessage = (ws, data) => {
         const parsedMsg = JSON.parse(data.toString());
         switch (parsedMsg.type) {
             case "set-name":
-                ws.name = parsedMsg.payload.name; // Update the name for the client
+                ws.name = parsedMsg.payload.name;
                 ws.send(JSON.stringify({
                     message: `Name set to ${ws.name}`,
                 }));
@@ -132,12 +52,9 @@ const handleMessage = (ws, data) => {
             case "leave-room":
                 leaveRoom(ws, parsedMsg.payload.roomId);
                 break;
-            case "send-message":
-                sendMessage(ws, parsedMsg.payload.roomId, parsedMsg.payload.message);
-                break;
             default:
                 ws.send(JSON.stringify({
-                    message: "invalid message type1",
+                    message: "invalid message type",
                 }));
         }
     }
@@ -155,7 +72,7 @@ const sendMessage = (ws, roomId, message) => {
             member.send(JSON.stringify({
                 chatMsg: {
                     text: message.text,
-                    by: ws.name, // Use the name of the sender
+                    by: ws.name,
                 },
             }));
         });
@@ -174,7 +91,6 @@ const createRoom = (ws) => {
         message: `Room created with ID: ${roomId}`,
         roomId: roomId,
     }));
-    console.log(rooms, "end");
 };
 const joinRoom = (ws, roomId) => {
     const room = rooms.find((room) => room.roomId === roomId);
@@ -209,5 +125,29 @@ const leaveRoom = (ws, roomId) => {
     }
 };
 const generateId = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString(); // Ensures a 6-digit number
+    return Math.floor(100000 + Math.random() * 900000).toString();
 };
+const handleDisconnect = (ws) => {
+    rooms.forEach((room) => {
+        room.members = room.members.filter((member) => member !== ws);
+        if (room.members.length === 0) {
+            const index = rooms.indexOf(room);
+            rooms.splice(index, 1);
+        }
+    });
+    console.log("Client disconnected");
+};
+const shutdown = () => {
+    console.log("Shutting down WebSocket server...");
+    wss.clients.forEach((client) => {
+        if (client.readyState === ws_1.WebSocket.OPEN) {
+            client.close(1001, "Server shutting down");
+        }
+    });
+    wss.close(() => {
+        console.log("WebSocket server closed.");
+        process.exit(0);
+    });
+};
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

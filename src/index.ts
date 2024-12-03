@@ -8,43 +8,62 @@ interface ExtendedWebSocket extends WebSocket {
 
 dotenv.config();
 const port = parseInt(process.env.PORT || "8080");
-const wss = new WebSocketServer({ port: port });
-console.log(`Server started on port ${port}`);
+
+let wss: WebSocketServer;
+
+const startServer = (port: number) => {
+  wss = new WebSocketServer({ port: port });
+
+  wss.on("listening", () => {
+    console.log(`Server started on port ${port}`);
+  });
+
+  wss.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use, trying port ${port + 1}`);
+      startServer(port + 1);
+    } else {
+      console.error("Server error:", err);
+    }
+  });
+
+  wss.on("connection", (ws: ExtendedWebSocket) => {
+    ws.clientId = generateId();
+    ws.name = "Anonymous";
+
+    ws.on("message", (data) => {
+      handleMessage(ws, data);
+    });
+
+    ws.on("close", () => {
+      handleDisconnect(ws);
+    });
+
+    setInterval(() => {
+      ws.send(
+        JSON.stringify({
+          rooms: rooms.map((room) => room.roomId),
+        })
+      );
+    }, 3000);
+    ws.send(
+      JSON.stringify({
+        message: "connected",
+        clientId: ws.clientId,
+      })
+    );
+
+    console.log(`Client connected with ID: ${ws.clientId}`);
+  });
+};
+
+startServer(port);
 
 type Room = {
   roomId: string;
   members: WebSocket[];
 };
 const rooms: Room[] = [];
-
-wss.on("connection", (ws: ExtendedWebSocket) => {
-  ws.clientId = generateId();
-  ws.name = "Anonymous";
-
-  ws.on("message", (data) => {
-    handleMessage(ws, data);
-  });
-
-  ws.on("close", () => {
-    handleDisconnect(ws);
-  });
-
-  setInterval(() => {
-    ws.send(
-      JSON.stringify({
-        rooms: rooms.map((room) => room.roomId),
-      })
-    );
-  }, 3000);
-  ws.send(
-    JSON.stringify({
-      message: "connected",
-      clientId: ws.clientId,
-    })
-  );
-
-  console.log(`Client connected with ID: ${ws.clientId}`);
-});
 
 const handleMessage = (ws: ExtendedWebSocket, data: RawData) => {
   try {
